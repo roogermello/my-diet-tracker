@@ -2,9 +2,10 @@
 <html lang="pt-BR">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Tracker IFPA - v4 Stable</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Tracker IFPA - v5.3 Cardio 400</title>
     <style>
+        /* --- CSS BASE (Mantido) --- */
         :root {
             --bg-color: #0f172a;
             --surface-color: #1e293b;
@@ -12,7 +13,7 @@
             --danger-color: #ef4444;
             --text-primary: #f8fafc;
             --text-secondary: #94a3b8;
-            --table-border: #334155;
+            --modal-overlay: rgba(0, 0, 0, 0.85);
         }
 
         body {
@@ -23,9 +24,10 @@
             padding: 15px;
             display: flex;
             justify-content: center;
+            -webkit-tap-highlight-color: transparent;
         }
 
-        .app-container { width: 100%; max-width: 500px; display: flex; flex-direction: column; gap: 15px; }
+        .app-container { width: 100%; max-width: 500px; display: flex; flex-direction: column; gap: 15px; position: relative; z-index: 1; }
 
         .card {
             background-color: var(--surface-color);
@@ -39,12 +41,8 @@
 
         /* PAINEL DE CONTROLE */
         .main-result {
-            text-align: center;
-            padding: 15px;
-            border-radius: 12px;
-            background: rgba(0,0,0,0.3);
-            border: 2px solid #334155;
-            margin-bottom: 10px;
+            text-align: center; padding: 15px; border-radius: 12px;
+            background: rgba(0,0,0,0.3); border: 2px solid #334155; margin-bottom: 10px;
         }
         .result-value { font-size: 2.5rem; font-weight: 900; line-height: 1.1; margin: 5px 0; }
         .result-explain { font-size: 0.8rem; opacity: 0.8; }
@@ -68,8 +66,9 @@
             padding: 12px 4px; border-radius: 8px; border: none; font-weight: 600; font-size: 0.75rem;
             cursor: pointer; display: flex; flex-direction: column; align-items: center; gap: 4px;
             color: white; text-align: center; height: 100%; justify-content: center;
+            transition: transform 0.1s, background 0.2s;
         }
-        .btn-action:active { transform: scale(0.96); }
+        .btn-action:active { transform: scale(0.95); }
         .btn-action span { font-size: 0.65rem; opacity: 0.8; font-weight: normal; }
 
         .btn-jejum { background: #3b82f6; }
@@ -87,60 +86,80 @@
         /* INPUTS E UTILS */
         .input-row { display: flex; gap: 8px; margin-bottom: 10px; }
         input { background: #0f172a; border: 1px solid #334155; color: white; padding: 10px; border-radius: 8px; flex: 1; }
-        .btn-add-manual { background: #334155; color: white; border: none; border-radius: 8px; width: 40px; }
+        .btn-add-manual { background: #334155; color: white; border: none; border-radius: 8px; width: 40px; font-size: 1.2rem; }
         
         .log-list { list-style: none; padding: 0; margin: 0; max-height: 120px; overflow-y: auto; font-size: 0.8rem; }
         .log-item { display: flex; justify-content: space-between; padding: 6px 0; border-bottom: 1px solid #334155; }
-        .btn-del { background: none; border: none; color: #ef4444; margin-left: 10px; cursor: pointer; }
+        .btn-del { background: none; border: none; color: #ef4444; margin-left: 10px; cursor: pointer; padding: 0 5px; }
         
         .btn-close-day {
             width: 100%; padding: 15px; margin-top: 15px;
             background: var(--success-color); color: #000; font-weight: bold; border: none; border-radius: 8px;
             text-transform: uppercase; cursor: pointer; letter-spacing: 1px;
         }
+
+        /* --- MODAL DE CONFIRMAÇÃO --- */
+        .modal-overlay {
+            position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+            background: var(--modal-overlay); z-index: 100;
+            display: none; /* Escondido por padrão */
+            justify-content: center; align-items: center; padding: 20px; box-sizing: border-box;
+            backdrop-filter: blur(3px);
+        }
+        
+        .modal-box {
+            background: var(--surface-color); padding: 20px; border-radius: 16px;
+            width: 100%; max-width: 400px; text-align: center;
+            border: 1px solid rgba(255,255,255,0.1);
+            box-shadow: 0 10px 25px rgba(0,0,0,0.5);
+        }
+
+        .modal-img-container {
+            width: 100%; height: 250px;
+            background: #0f172a; border-radius: 12px; margin: 15px 0;
+            overflow: hidden; display: flex; align-items: center; justify-content: center;
+        }
+        
+        .modal-img { max-width: 100%; max-height: 100%; object-fit: contain; }
+
+        .modal-actions { display: flex; gap: 10px; margin-top: 20px; }
+        .btn-modal { flex: 1; padding: 12px; border: none; border-radius: 8px; font-weight: bold; cursor: pointer; font-size: 1rem; }
+        .btn-confirm { background: var(--success-color); color: #000; }
+        .btn-cancel { background: #334155; color: white; }
     </style>
 </head>
 <body>
 
 <div class="app-container">
-
     <div class="card">
         <h3>Engenharia do Dia</h3>
-        
         <div class="main-result" id="resultBox">
             <span class="result-explain" id="statusLabel">SALDO ATUAL</span>
             <div class="result-value" id="balanceValue">0</div>
             <span class="result-explain" id="statusExplain">kcal de déficit</span>
         </div>
-
         <div class="dashboard-grid">
-            <div class="dash-item">
-                <span class="dash-val" id="totalIn">0</span>
-                <span class="dash-label">Comida</span>
-            </div>
-            <div class="dash-item">
-                <span class="dash-val" id="totalOut">0</span>
-                <span class="dash-label">Basal + Treino</span>
-            </div>
+            <div class="dash-item"><span class="dash-val" id="totalIn">0</span><span class="dash-label">Comida</span></div>
+            <div class="dash-item"><span class="dash-val" id="totalOut">0</span><span class="dash-label">Basal + Treino</span></div>
         </div>
     </div>
 
     <div class="card">
         <h3>Registros Rápidos</h3>
-        
         <div class="grid-buttons">
-            <button class="btn-action btn-jejum" onclick="addPreset('sup_jejum')">JEJUM<br><span>Café+Ioimbina</span></button>
-            <button class="btn-action btn-almoco" onclick="addPreset('sup_almoco')">ALMOÇO<br><span>Whey+Combo</span></button>
-            <button class="btn-action btn-noite" onclick="addPreset('sup_noite')">NOITE<br><span>Articular</span></button>
+            <button class="btn-action btn-jejum" onclick="handleClick('sup_jejum')">JEJUM<br><span>Café+Ioimbina</span></button>
+            <button class="btn-action btn-almoco" onclick="handleClick('sup_almoco')">ALMOÇO<br><span>Whey+Combo</span></button>
+            <button class="btn-action btn-noite" onclick="handleClick('sup_noite')">NOITE<br><span>Articular</span></button>
         </div>
 
         <div class="grid-buttons-train">
-            <button class="btn-action btn-train" onclick="addPreset('treino_a')">A: FORÇA<br><span>~480 kcal</span></button>
-            <button class="btn-action btn-train" onclick="addPreset('treino_b')">B: COSTAS<br><span>~480 kcal</span></button>
-            <button class="btn-action btn-train" onclick="addPreset('treino_c')">C: LEGS<br><span>~640 kcal</span></button>
-            <button class="btn-action btn-train" onclick="addPreset('treino_d')">D: OMBRO<br><span>~350 kcal</span></button>
-            <button class="btn-action btn-train" onclick="addPreset('treino_e')">E: BÍCEPS<br><span>~440 kcal</span></button>
-            <button class="btn-action btn-train" onclick="addPreset('treino_cardio')">SÓ CARDIO<br><span>~250 kcal</span></button>
+            <button class="btn-action btn-train" onclick="handleClick('treino_a')">A: FORÇA<br><span>~480 kcal</span></button>
+            <button class="btn-action btn-train" onclick="handleClick('treino_b')">B: COSTAS<br><span>~480 kcal</span></button>
+            <button class="btn-action btn-train" onclick="handleClick('treino_c')">C: LEGS<br><span>~640 kcal</span></button>
+            <button class="btn-action btn-train" onclick="handleClick('treino_d')">D: OMBRO<br><span>~350 kcal</span></button>
+            <button class="btn-action btn-train" onclick="handleClick('treino_e')">E: BÍCEPS<br><span>~440 kcal</span></button>
+            
+            <button class="btn-action btn-train" onclick="handleClick('treino_cardio')">SÓ CARDIO<br><span>~400 kcal</span></button>
         </div>
 
         <div class="input-row" style="margin-top: 15px;">
@@ -148,71 +167,76 @@
             <input type="number" id="manualCals" placeholder="Kcal" style="flex:0.4">
             <button class="btn-add-manual" onclick="addManual()">+</button>
         </div>
-
         <ul class="log-list" id="logList"></ul>
-        
         <button class="btn-close-day" onclick="closeDay()">💾 Gravar Histórico (Fechar Dia)</button>
     </div>
 
     <div class="card">
         <h3>Resultados Acumulados</h3>
-        
-        <div class="total-loss-banner">
-            <span>Perda Estimada Total:</span>
-            <span id="totalLossValue">0.0 kg</span>
-        </div>
-
+        <div class="total-loss-banner"><span>Perda Estimada Total:</span><span id="totalLossValue">0.0 kg</span></div>
         <table class="history-table">
-            <thead>
-                <tr>
-                    <th>Data</th>
-                    <th>Saldo</th>
-                    <th>Excluir</th>
-                </tr>
-            </thead>
-            <tbody id="historyBody">
-                </tbody>
+            <thead><tr><th>Data</th><th>Saldo</th><th>Excluir</th></tr></thead>
+            <tbody id="historyBody"></tbody>
         </table>
-        
         <div style="text-align: center; margin-top: 15px;">
-            <button onclick="clearHistory()" style="background:none; border:none; color:#475569; font-size:0.75rem;">Resetar Todo o Histórico</button>
+            <button onclick="clearHistory()" style="background:none; border:none; color:#475569; font-size:0.75rem;">Resetar Histórico</button>
         </div>
     </div>
+</div>
 
+<div class="modal-overlay" id="confirmationModal">
+    <div class="modal-box">
+        <h3 id="modalTitle" style="border:none; margin-bottom:0; color:white;">Confirmar Treino</h3>
+        
+        <div class="modal-img-container">
+            <img id="modalImgSrc" class="modal-img" src="" alt="Protocolo">
+            <span id="imgPlaceholder" style="display:none; color:#94a3b8; font-size:0.8rem;">Imagem não encontrada no GitHub.<br>Verifique os nomes.</span>
+        </div>
+
+        <div style="margin-bottom: 20px; color: var(--text-secondary); font-size: 0.9rem;">
+            Este é o protocolo correto para hoje?
+            <div id="modalKcalValue" style="color: var(--success-color); font-weight:bold; margin-top:5px;"></div>
+        </div>
+
+        <div class="modal-actions">
+            <button class="btn-modal btn-cancel" onclick="closeModal()">Voltar</button>
+            <button class="btn-modal btn-confirm" onclick="confirmDraft()">SIM, Registrar</button>
+        </div>
+    </div>
 </div>
 
 <script>
-    // --- CONSTANTES ---
-    const USER = { tmb: 1850 }; // TMB Conservadora
+    // --- CONFIGURAÇÃO ---
+    const USER = { tmb: 1850 };
     const KCAL_PER_KG = 7700;
 
-    // --- PRESETS (Ajustados para baixo - Conservador) ---
-    // Redução média de ~20% sobre a estimativa original
+    // --- PRESETS CORRIGIDOS ---
     const PRESETS = {
         'sup_jejum': { name: 'Jejum (Café+Ioimbina)', cals: 0, type: 'sup' },
         'sup_almoco': { name: 'Almoço (Whey+Combo)', cals: 125, type: 'food' },
         'sup_noite': { name: 'Noite (Articular)', cals: 0, type: 'sup' },
         
-        // Treinos reajustados para "Esforço Realista"
-        'treino_a': { name: 'Treino A (Força)', cals: 480, type: 'burn' }, // Era 600
-        'treino_b': { name: 'Treino B (Costas)', cals: 480, type: 'burn' }, // Era 600
-        'treino_c': { name: 'Treino C (Legs)', cals: 640, type: 'burn' },   // Era 800
-        'treino_d': { name: 'Treino D (Ombro)', cals: 350, type: 'burn' },  // Era 500 (Cuidado artrose)
-        'treino_e': { name: 'Treino E (Bíceps)', cals: 440, type: 'burn' }, // Era 550
-        'treino_cardio': { name: 'Cardio Puro', cals: 250, type: 'burn' }   // Mantido (Esteira é preciso)
+        // TREINOS (Nomes Simplificados: A.png, B.png...)
+        'treino_a': { name: 'Treino A (Força)', cals: 480, type: 'burn', img: 'A.png' },
+        'treino_b': { name: 'Treino B (Costas)', cals: 480, type: 'burn', img: 'B.png' },
+        'treino_c': { name: 'Treino C (Legs)', cals: 640, type: 'burn', img: 'C.png' },
+        'treino_d': { name: 'Treino D (Ombro)', cals: 350, type: 'burn', img: 'D.png' },
+        'treino_e': { name: 'Treino E (Bíceps)', cals: 440, type: 'burn', img: 'E.png' },
+        
+        // UPDATE: Cardio agora com 400 kcal
+        'treino_cardio': { name: 'Cardio (Foco Total)', cals: 400, type: 'burn', img: null }
     };
 
-    // --- ESTADO GLOBAL ---
+    // --- ESTADO ---
     let todayEntries = [];
-    let historyLog = []; // [{date: '20/01', balance: 500}, ...]
+    let historyLog = [];
+    let draftKey = null;
 
     // --- INICIALIZAÇÃO ---
     function init() {
-        // Carrega Histórico
         const savedHistory = localStorage.getItem('v4_history');
         if(savedHistory) historyLog = JSON.parse(savedHistory);
 
-        // Carrega Hoje (Persistência de refresh)
         const savedDate = localStorage.getItem('v4_date');
         const today = new Date().toLocaleDateString('pt-BR');
 
@@ -222,13 +246,59 @@
             localStorage.setItem('v4_date', today);
             todayEntries = [];
         }
-        
         render();
         renderHistory();
     }
 
-    // --- AÇÕES DO DIA ---
-    function addPreset(key) {
+    // --- LÓGICA DE CLIQUE E MODAL ---
+    function handleClick(key) {
+        const preset = PRESETS[key];
+        // Abre modal apenas se tiver imagem definida (null não abre)
+        if (preset.type === 'burn' && preset.img) {
+            openModal(key);
+        } else {
+            addEntryDirect(key);
+        }
+    }
+
+    const modal = document.getElementById('confirmationModal');
+    const modalImg = document.getElementById('modalImgSrc');
+    const imgPlaceholder = document.getElementById('imgPlaceholder');
+
+    function openModal(key) {
+        draftKey = key;
+        const preset = PRESETS[key];
+        
+        document.getElementById('modalTitle').textContent = preset.name.split('(')[0];
+        document.getElementById('modalKcalValue').textContent = `Gasto estimado: -${preset.cals} kcal`;
+        
+        modalImg.style.display = 'block';
+        imgPlaceholder.style.display = 'none';
+        modalImg.src = preset.img;
+        
+        modalImg.onerror = function() {
+            this.style.display = 'none';
+            imgPlaceholder.style.display = 'block';
+        };
+
+        modal.style.display = 'flex';
+    }
+
+    function closeModal() {
+        modal.style.display = 'none';
+        draftKey = null;
+        modalImg.src = '';
+    }
+
+    function confirmDraft() {
+        if(draftKey) {
+            addEntryDirect(draftKey);
+            closeModal();
+        }
+    }
+
+    // --- CORE (Add/Remove/Save) ---
+    function addEntryDirect(key) {
         todayEntries.push({ ...PRESETS[key], id: Date.now() });
         saveToday();
     }
@@ -253,36 +323,28 @@
         render();
     }
 
-    // --- FECHAR DIA & HISTÓRICO ---
+    // --- FECHAMENTO DO DIA ---
     function closeDay() {
         const stats = calculateStats();
-        const today = new Date().toLocaleDateString('pt-BR', {day: '2-digit', month: '2-digit'}); // ex: 20/01
+        const today = new Date().toLocaleDateString('pt-BR', {day: '2-digit', month: '2-digit'});
         
-        // Verifica se já não fechou hoje para evitar duplicidade
         const alreadyClosed = historyLog.some(log => log.date === today);
         if(alreadyClosed) {
-            if(!confirm("Já existe um registro para hoje. Deseja sobrescrever (adicionar este novo)?")) return;
-            // Se confirmar, remove o anterior de hoje
+            if(!confirm("Já existe registro hoje. Sobrescrever?")) return;
             historyLog = historyLog.filter(log => log.date !== today);
         }
 
         if(confirm(`Gravar dia ${today} com Saldo de ${stats.balance} kcal?`)) {
-            historyLog.push({
-                date: today,
-                balance: stats.balance,
-                id: Date.now()
-            });
-            
-            // Zera o dia atual
+            historyLog.push({ date: today, balance: stats.balance, id: Date.now() });
             todayEntries = [];
             localStorage.setItem('v4_history', JSON.stringify(historyLog));
-            saveToday(); // Salva o array vazio
+            saveToday();
             renderHistory();
         }
     }
 
     function deleteHistoryItem(id) {
-        if(confirm("Apagar este registro do histórico?")) {
+        if(confirm("Apagar este registro?")) {
             historyLog = historyLog.filter(item => item.id !== id);
             localStorage.setItem('v4_history', JSON.stringify(historyLog));
             renderHistory();
@@ -290,23 +352,20 @@
     }
 
     function clearHistory() {
-        if(confirm("ATENÇÃO: Isso apaga todo o histórico de perda de peso. Confirmar?")) {
+        if(confirm("ATENÇÃO: Apagar TODO o histórico?")) {
             historyLog = [];
             localStorage.setItem('v4_history', JSON.stringify([]));
             renderHistory();
         }
     }
 
-    // --- RENDERIZAÇÃO ---
+    // --- RENDER ---
     function calculateStats() {
-        let foodIn = 0;
-        let burnOut = 0;
+        let foodIn = 0; let burnOut = 0;
         todayEntries.forEach(e => {
             if(e.type === 'food') foodIn += e.cals;
             if(e.type === 'burn') burnOut += e.cals;
         });
-        // Saldo = (TMB + Queima) - Comida
-        // Positivo = Emagreceu
         const totalOut = USER.tmb + burnOut;
         const balance = totalOut - foodIn;
         return { foodIn, totalOut, balance, burnOut };
@@ -314,29 +373,23 @@
 
     function render() {
         const s = calculateStats();
-        
-        // Dashboard
         document.getElementById('totalIn').textContent = s.foodIn;
         document.getElementById('totalOut').textContent = s.totalOut;
         
         const balEl = document.getElementById('balanceValue');
         const boxEl = document.getElementById('resultBox');
-        
         balEl.textContent = s.balance;
         
         if(s.balance >= 0) {
-            // Déficit (Verde)
             balEl.style.color = 'var(--success-color)';
             boxEl.style.borderColor = 'var(--success-color)';
             document.getElementById('statusLabel').textContent = "QUEIMA DE GORDURA (DÉFICIT)";
         } else {
-            // Superávit (Vermelho)
             balEl.style.color = 'var(--danger-color)';
             boxEl.style.borderColor = 'var(--danger-color)';
             document.getElementById('statusLabel').textContent = "ACÚMULO DE GORDURA (SUPERÁVIT)";
         }
 
-        // Lista do dia
         const list = document.getElementById('logList');
         list.innerHTML = '';
         todayEntries.slice().reverse().forEach(e => {
@@ -344,11 +397,7 @@
             li.className = 'log-item';
             const signal = e.type === 'food' ? '+' : (e.type === 'burn' ? '-' : '');
             const color = e.type === 'food' ? '#fff' : (e.type === 'burn' ? '#fca5a5' : '#93c5fd');
-            
-            li.innerHTML = `
-                <span style="color:${color}">${e.name}</span>
-                <span>${signal}${e.cals} <button class="btn-del" onclick="removeEntry(${e.id})">×</button></span>
-            `;
+            li.innerHTML = `<span style="color:${color}">${e.name}</span><span>${signal}${e.cals} <button class="btn-del" onclick="removeEntry(${e.id})">×</button></span>`;
             list.appendChild(li);
         });
     }
@@ -356,27 +405,14 @@
     function renderHistory() {
         const tbody = document.getElementById('historyBody');
         tbody.innerHTML = '';
-        
         let totalBalance = 0;
-
-        // Ordena por data (recente primeiro se preferir, ou ordem de inserção)
-        // Aqui mantemos ordem de inserção mas iteramos reverso para mostrar o último no topo
         historyLog.slice().reverse().forEach(log => {
             totalBalance += log.balance;
-            
             const tr = document.createElement('tr');
             const valClass = log.balance >= 0 ? 'val-pos' : 'val-neg';
-            const valSymbol = log.balance >= 0 ? 'Queimou ' : 'Acumulou ';
-            
-            tr.innerHTML = `
-                <td>${log.date}</td>
-                <td class="${valClass}">${log.balance}</td>
-                <td style="text-align:right"><button class="btn-del" onclick="deleteHistoryItem(${log.id})">🗑</button></td>
-            `;
+            tr.innerHTML = `<td>${log.date}</td><td class="${valClass}">${log.balance}</td><td style="text-align:right"><button class="btn-del" onclick="deleteHistoryItem(${log.id})">🗑</button></td>`;
             tbody.appendChild(tr);
         });
-
-        // Atualiza Badge Total
         const kg = (totalBalance / KCAL_PER_KG).toFixed(2);
         document.getElementById('totalLossValue').textContent = `${kg} kg`;
     }
