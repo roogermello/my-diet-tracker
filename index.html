@@ -3,9 +3,10 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Tracker IFPA - v5.3 Cardio 400</title>
+    <title>Tracker IFPA - v6 AI Vision</title>
+    <script src='https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js'></script>
     <style>
-        /* --- CSS BASE (Mantido) --- */
+        /* --- CSS BASE --- */
         :root {
             --bg-color: #0f172a;
             --surface-color: #1e293b;
@@ -14,6 +15,7 @@
             --text-primary: #f8fafc;
             --text-secondary: #94a3b8;
             --modal-overlay: rgba(0, 0, 0, 0.85);
+            --ai-color: #8b5cf6; /* Roxo IA */
         }
 
         body {
@@ -39,7 +41,7 @@
 
         h3 { margin: 0 0 10px 0; font-size: 0.9rem; text-transform: uppercase; letter-spacing: 1px; color: var(--text-secondary); border-bottom: 1px solid #334155; padding-bottom: 5px; }
 
-        /* PAINEL DE CONTROLE */
+        /* PAINEL E DASHBOARD */
         .main-result {
             text-align: center; padding: 15px; border-radius: 12px;
             background: rgba(0,0,0,0.3); border: 2px solid #334155; margin-bottom: 10px;
@@ -75,15 +77,22 @@
         .btn-almoco { background: #f59e0b; }
         .btn-noite { background: #6366f1; }
         .btn-train { background: rgba(239, 68, 68, 0.1); border: 1px solid #ef4444; color: #fca5a5; }
+        
+        /* BOTÃO UPLOAD IA */
+        .btn-ocr {
+            background: linear-gradient(135deg, var(--ai-color), #6d28d9);
+            color: white; grid-column: span 2; display: flex; flex-direction: row; justify-content: center; gap: 10px;
+            font-size: 0.9rem; padding: 12px;
+        }
 
-        /* HISTÓRICO E TABELA */
+        /* TABELA E HISTÓRICO */
         .history-table { width: 100%; border-collapse: collapse; font-size: 0.85rem; margin-top: 10px; }
-        .history-table th { text-align: left; color: var(--text-secondary); padding: 5px; border-bottom: 1px solid var(--table-border); }
+        .history-table th { text-align: left; color: var(--text-secondary); padding: 5px; border-bottom: 1px solid #334155; }
         .history-table td { padding: 8px 5px; border-bottom: 1px solid rgba(255,255,255,0.05); }
         .val-pos { color: var(--success-color); }
         .val-neg { color: var(--danger-color); }
 
-        /* INPUTS E UTILS */
+        /* INPUTS */
         .input-row { display: flex; gap: 8px; margin-bottom: 10px; }
         input { background: #0f172a; border: 1px solid #334155; color: white; padding: 10px; border-radius: 8px; flex: 1; }
         .btn-add-manual { background: #334155; color: white; border: none; border-radius: 8px; width: 40px; font-size: 1.2rem; }
@@ -98,34 +107,32 @@
             text-transform: uppercase; cursor: pointer; letter-spacing: 1px;
         }
 
-        /* --- MODAL DE CONFIRMAÇÃO --- */
+        /* MODAIS */
         .modal-overlay {
             position: fixed; top: 0; left: 0; width: 100%; height: 100%;
             background: var(--modal-overlay); z-index: 100;
-            display: none; /* Escondido por padrão */
-            justify-content: center; align-items: center; padding: 20px; box-sizing: border-box;
+            display: none; justify-content: center; align-items: center; padding: 20px; box-sizing: border-box;
             backdrop-filter: blur(3px);
         }
-        
         .modal-box {
             background: var(--surface-color); padding: 20px; border-radius: 16px;
             width: 100%; max-width: 400px; text-align: center;
             border: 1px solid rgba(255,255,255,0.1);
             box-shadow: 0 10px 25px rgba(0,0,0,0.5);
         }
-
         .modal-img-container {
-            width: 100%; height: 250px;
-            background: #0f172a; border-radius: 12px; margin: 15px 0;
+            width: 100%; height: 250px; background: #0f172a; border-radius: 12px; margin: 15px 0;
             overflow: hidden; display: flex; align-items: center; justify-content: center;
         }
-        
         .modal-img { max-width: 100%; max-height: 100%; object-fit: contain; }
-
         .modal-actions { display: flex; gap: 10px; margin-top: 20px; }
         .btn-modal { flex: 1; padding: 12px; border: none; border-radius: 8px; font-weight: bold; cursor: pointer; font-size: 1rem; }
         .btn-confirm { background: var(--success-color); color: #000; }
         .btn-cancel { background: #334155; color: white; }
+
+        /* LOADING OCR */
+        #ocrLoading { font-size: 0.9rem; color: var(--ai-color); margin-top: 10px; display: none; font-weight: bold; animation: pulse 1.5s infinite; }
+        @keyframes pulse { 0% { opacity: 0.5; } 50% { opacity: 1; } 100% { opacity: 0.5; } }
     </style>
 </head>
 <body>
@@ -158,15 +165,25 @@
             <button class="btn-action btn-train" onclick="handleClick('treino_c')">C: LEGS<br><span>~640 kcal</span></button>
             <button class="btn-action btn-train" onclick="handleClick('treino_d')">D: OMBRO<br><span>~350 kcal</span></button>
             <button class="btn-action btn-train" onclick="handleClick('treino_e')">E: BÍCEPS<br><span>~440 kcal</span></button>
-            
             <button class="btn-action btn-train" onclick="handleClick('treino_cardio')">SÓ CARDIO<br><span>~400 kcal</span></button>
         </div>
 
-        <div class="input-row" style="margin-top: 15px;">
-            <input type="text" id="manualName" placeholder="Item extra...">
-            <input type="number" id="manualCals" placeholder="Kcal" style="flex:0.4">
-            <button class="btn-add-manual" onclick="addManual()">+</button>
+        <div style="margin-top: 20px; border-top: 1px solid #334155; padding-top: 15px;">
+            <div style="display:flex; gap:10px; margin-bottom:10px;">
+                 <button class="btn-action btn-ocr" onclick="triggerFileInput()" style="flex:1;">
+                    📸 Ler Card Calórico (IA)
+                 </button>
+                 <input type="file" id="fileInput" accept="image/*" style="display:none;" onchange="processImage(this)">
+            </div>
+            <div id="ocrLoading">👁‍🗨 Analisando imagem... aguarde...</div>
+
+            <div class="input-row">
+                <input type="text" id="manualName" placeholder="Nome (Ex: Card Almoço)">
+                <input type="number" id="manualCals" placeholder="Kcal" style="flex:0.4">
+                <button class="btn-add-manual" onclick="addManual()">+</button>
+            </div>
         </div>
+
         <ul class="log-list" id="logList"></ul>
         <button class="btn-close-day" onclick="closeDay()">💾 Gravar Histórico (Fechar Dia)</button>
     </div>
@@ -187,17 +204,14 @@
 <div class="modal-overlay" id="confirmationModal">
     <div class="modal-box">
         <h3 id="modalTitle" style="border:none; margin-bottom:0; color:white;">Confirmar Treino</h3>
-        
         <div class="modal-img-container">
             <img id="modalImgSrc" class="modal-img" src="" alt="Protocolo">
-            <span id="imgPlaceholder" style="display:none; color:#94a3b8; font-size:0.8rem;">Imagem não encontrada no GitHub.<br>Verifique os nomes.</span>
+            <span id="imgPlaceholder" style="display:none; color:#94a3b8; font-size:0.8rem;">Sem imagem.</span>
         </div>
-
         <div style="margin-bottom: 20px; color: var(--text-secondary); font-size: 0.9rem;">
             Este é o protocolo correto para hoje?
             <div id="modalKcalValue" style="color: var(--success-color); font-weight:bold; margin-top:5px;"></div>
         </div>
-
         <div class="modal-actions">
             <button class="btn-modal btn-cancel" onclick="closeModal()">Voltar</button>
             <button class="btn-modal btn-confirm" onclick="confirmDraft()">SIM, Registrar</button>
@@ -206,33 +220,26 @@
 </div>
 
 <script>
-    // --- CONFIGURAÇÃO ---
+    // --- CONFIG ---
     const USER = { tmb: 1850 };
     const KCAL_PER_KG = 7700;
-
-    // --- PRESETS CORRIGIDOS ---
     const PRESETS = {
         'sup_jejum': { name: 'Jejum (Café+Ioimbina)', cals: 0, type: 'sup' },
         'sup_almoco': { name: 'Almoço (Whey+Combo)', cals: 125, type: 'food' },
         'sup_noite': { name: 'Noite (Articular)', cals: 0, type: 'sup' },
-        
-        // TREINOS (Nomes Simplificados: A.png, B.png...)
         'treino_a': { name: 'Treino A (Força)', cals: 480, type: 'burn', img: 'A.png' },
         'treino_b': { name: 'Treino B (Costas)', cals: 480, type: 'burn', img: 'B.png' },
         'treino_c': { name: 'Treino C (Legs)', cals: 640, type: 'burn', img: 'C.png' },
         'treino_d': { name: 'Treino D (Ombro)', cals: 350, type: 'burn', img: 'D.png' },
         'treino_e': { name: 'Treino E (Bíceps)', cals: 440, type: 'burn', img: 'E.png' },
-        
-        // UPDATE: Cardio agora com 400 kcal
         'treino_cardio': { name: 'Cardio (Foco Total)', cals: 400, type: 'burn', img: null }
     };
 
-    // --- ESTADO ---
     let todayEntries = [];
     let historyLog = [];
     let draftKey = null;
 
-    // --- INICIALIZAÇÃO ---
+    // --- INIT ---
     function init() {
         const savedHistory = localStorage.getItem('v4_history');
         if(savedHistory) historyLog = JSON.parse(savedHistory);
@@ -250,15 +257,56 @@
         renderHistory();
     }
 
-    // --- LÓGICA DE CLIQUE E MODAL ---
+    // --- LOGICA OCR (PROCESSAMENTO DE IMAGEM) ---
+    function triggerFileInput() {
+        document.getElementById('fileInput').click();
+    }
+
+    function processImage(input) {
+        if (!input.files || !input.files[0]) return;
+        
+        const file = input.files[0];
+        const loading = document.getElementById('ocrLoading');
+        loading.style.display = 'block';
+
+        Tesseract.recognize(
+            file,
+            'eng', // Inglês lê números melhor
+            { logger: m => console.log(m) }
+        ).then(({ data: { text } }) => {
+            loading.style.display = 'none';
+            console.log("Texto detectado:", text);
+            
+            // Lógica Heurística: Tentar achar o maior número inteiro na imagem (provavelmente o Total)
+            // Filtra números "quebrados" ou muito pequenos
+            const numbers = text.match(/\d+/g);
+            
+            if (numbers) {
+                // Converte para inteiros e ordena do maior para o menor
+                const candidates = numbers.map(n => parseInt(n)).filter(n => n > 50 && n < 5000).sort((a,b) => b - a);
+                
+                if (candidates.length > 0) {
+                    const detected = candidates[0]; // Pega o maior
+                    document.getElementById('manualName').value = "Card App (Scan)";
+                    document.getElementById('manualCals').value = detected;
+                    alert(`Detectamos o valor: ${detected} kcal.\nConfirme se está correto e clique no botão (+)`);
+                } else {
+                    alert("Não identifiquei números claros. Tente digitar manualmente.");
+                }
+            } else {
+                alert("Não consegui ler o texto da imagem. Tente uma foto mais nítida.");
+            }
+        }).catch(err => {
+            loading.style.display = 'none';
+            alert("Erro ao processar imagem: " + err);
+        });
+    }
+
+    // --- LÓGICA PADRÃO ---
     function handleClick(key) {
         const preset = PRESETS[key];
-        // Abre modal apenas se tiver imagem definida (null não abre)
-        if (preset.type === 'burn' && preset.img) {
-            openModal(key);
-        } else {
-            addEntryDirect(key);
-        }
+        if (preset.type === 'burn' && preset.img) openModal(key);
+        else addEntryDirect(key);
     }
 
     const modal = document.getElementById('confirmationModal');
@@ -268,36 +316,18 @@
     function openModal(key) {
         draftKey = key;
         const preset = PRESETS[key];
-        
         document.getElementById('modalTitle').textContent = preset.name.split('(')[0];
-        document.getElementById('modalKcalValue').textContent = `Gasto estimado: -${preset.cals} kcal`;
-        
+        document.getElementById('modalKcalValue').textContent = `Gasto: -${preset.cals} kcal`;
         modalImg.style.display = 'block';
         imgPlaceholder.style.display = 'none';
         modalImg.src = preset.img;
-        
-        modalImg.onerror = function() {
-            this.style.display = 'none';
-            imgPlaceholder.style.display = 'block';
-        };
-
+        modalImg.onerror = function() { this.style.display = 'none'; imgPlaceholder.style.display = 'block'; };
         modal.style.display = 'flex';
     }
 
-    function closeModal() {
-        modal.style.display = 'none';
-        draftKey = null;
-        modalImg.src = '';
-    }
+    function closeModal() { modal.style.display = 'none'; draftKey = null; modalImg.src = ''; }
+    function confirmDraft() { if(draftKey) { addEntryDirect(draftKey); closeModal(); } }
 
-    function confirmDraft() {
-        if(draftKey) {
-            addEntryDirect(draftKey);
-            closeModal();
-        }
-    }
-
-    // --- CORE (Add/Remove/Save) ---
     function addEntryDirect(key) {
         todayEntries.push({ ...PRESETS[key], id: Date.now() });
         saveToday();
@@ -306,7 +336,7 @@
     function addManual() {
         const name = document.getElementById('manualName').value;
         const cals = parseInt(document.getElementById('manualCals').value);
-        if(!name || isNaN(cals)) return;
+        if(!name || isNaN(cals)) return alert("Preencha o valor!");
         todayEntries.push({ name, cals, type: 'food', id: Date.now() });
         document.getElementById('manualName').value = '';
         document.getElementById('manualCals').value = '';
@@ -323,17 +353,14 @@
         render();
     }
 
-    // --- FECHAMENTO DO DIA ---
     function closeDay() {
         const stats = calculateStats();
         const today = new Date().toLocaleDateString('pt-BR', {day: '2-digit', month: '2-digit'});
-        
         const alreadyClosed = historyLog.some(log => log.date === today);
         if(alreadyClosed) {
             if(!confirm("Já existe registro hoje. Sobrescrever?")) return;
             historyLog = historyLog.filter(log => log.date !== today);
         }
-
         if(confirm(`Gravar dia ${today} com Saldo de ${stats.balance} kcal?`)) {
             historyLog.push({ date: today, balance: stats.balance, id: Date.now() });
             todayEntries = [];
@@ -359,7 +386,6 @@
         }
     }
 
-    // --- RENDER ---
     function calculateStats() {
         let foodIn = 0; let burnOut = 0;
         todayEntries.forEach(e => {
@@ -375,21 +401,18 @@
         const s = calculateStats();
         document.getElementById('totalIn').textContent = s.foodIn;
         document.getElementById('totalOut').textContent = s.totalOut;
-        
         const balEl = document.getElementById('balanceValue');
         const boxEl = document.getElementById('resultBox');
         balEl.textContent = s.balance;
-        
         if(s.balance >= 0) {
             balEl.style.color = 'var(--success-color)';
             boxEl.style.borderColor = 'var(--success-color)';
-            document.getElementById('statusLabel').textContent = "QUEIMA DE GORDURA (DÉFICIT)";
+            document.getElementById('statusLabel').textContent = "QUEIMA (DÉFICIT)";
         } else {
             balEl.style.color = 'var(--danger-color)';
             boxEl.style.borderColor = 'var(--danger-color)';
-            document.getElementById('statusLabel').textContent = "ACÚMULO DE GORDURA (SUPERÁVIT)";
+            document.getElementById('statusLabel').textContent = "ACÚMULO (SUPERÁVIT)";
         }
-
         const list = document.getElementById('logList');
         list.innerHTML = '';
         todayEntries.slice().reverse().forEach(e => {
